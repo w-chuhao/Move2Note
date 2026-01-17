@@ -6,14 +6,13 @@ from ml.pose_tasks import video_to_keypoints
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT / "models" / "pose_landmarker_lite.task"
-
 label_map = np.load(ROOT / "data" / "label_map.npy", allow_pickle=True).item()
-id_to_label = {v: k for k, v in label_map.items()}
+labels_sorted = [lbl for lbl, idx in sorted(label_map.items(), key=lambda kv: kv[1])]
 
 NOTE_MAP = {
-    "pushup": "E4",
-    "situp": "G4",
-    "squat": "C4",
+    "push_ups": "E4",
+    "sit_ups": "G4",
+    "squats": "C4",
 }
 
 T = 60
@@ -50,8 +49,15 @@ def main(video_path: str):
     )
     x = pad_trim_flatten(seq)
 
-    model = GRUClassifier(D, 128, len(label_map))
-    model.load_state_dict(torch.load(ROOT / "models" / "exercise.pt", map_location="cpu"))
+    state = torch.load(ROOT / "models" / "exercise.pt", map_location="cpu")
+    num_classes = state["fc.weight"].shape[0]
+
+    # Align labels with the checkpoint output dimensionality (drop extra labels like "test").
+    use_labels = labels_sorted[:num_classes]
+    id_to_label = {i: lbl for i, lbl in enumerate(use_labels)}
+
+    model = GRUClassifier(D, 128, num_classes)
+    model.load_state_dict(state)
     model.eval()
 
     with torch.no_grad():
@@ -59,7 +65,7 @@ def main(video_path: str):
         probs = torch.softmax(logits[0], dim=0).numpy()
 
     pred_id = int(probs.argmax())
-    pred_label = id_to_label[pred_id]
+    pred_label = id_to_label.get(pred_id, "unknown")
     conf = float(probs[pred_id])
     note = NOTE_MAP.get(pred_label, "NA")
 

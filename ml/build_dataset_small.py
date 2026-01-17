@@ -31,11 +31,30 @@ def make_windows(seq):
         windows.append(flat[start:start+T])
     return windows
 
+EXCLUDED_FOLDERS = {"test"}  # folders to skip
+VIDEO_EXTS = ("*.mp4", "*.MP4", "*.mov", "*.MOV", "*.avi", "*.webm")
+
+
+def augment_window(w, n_aug=2):
+    """Simple augmentation: time jitter + Gaussian noise."""
+    augmented = [w]
+    for _ in range(n_aug):
+        aug = w.copy()
+        # Small Gaussian noise on coordinates
+        aug += np.random.randn(*aug.shape).astype(np.float32) * 0.02
+        augmented.append(aug)
+        # Horizontal flip: negate x coordinates (every 3rd value starting at 0)
+        flipped = w.copy()
+        flipped[:, 0::3] *= -1
+        augmented.append(flipped)
+    return augmented
+
+
 def main():
     if not RAW.exists():
         raise FileNotFoundError(f"Missing {RAW}")
 
-    labels = sorted([p.name for p in RAW.iterdir() if p.is_dir()])
+    labels = sorted([p.name for p in RAW.iterdir() if p.is_dir() and p.name not in EXCLUDED_FOLDERS])
     if len(labels) < 2:
         raise RuntimeError("Need at least 2 label folders under data/raw/ (example: pushup/, squat/)")
 
@@ -46,7 +65,10 @@ def main():
     meta = []
 
     for label in labels:
-        for vid in (RAW / label).glob("*.mp4"):
+        vids = []
+        for ext in VIDEO_EXTS:
+            vids.extend((RAW / label).glob(ext))
+        for vid in vids:
             seq = video_to_keypoints(
                 video_path=str(vid),
                 model_path=str(MODEL_PATH),
@@ -55,8 +77,10 @@ def main():
             )
             windows = make_windows(seq)
             for w in windows:
-                X_list.append(w)
-                y_list.append(label_to_id[label])
+                # Apply augmentation to boost small datasets
+                for aug_w in augment_window(w, n_aug=2):
+                    X_list.append(aug_w)
+                    y_list.append(label_to_id[label])
             meta.append((label, vid.name, int(seq.shape[0]), len(windows)))
 
     if len(X_list) == 0:

@@ -14,12 +14,28 @@ num_classes = len(label_map)
 T = X.shape[1]
 D = X.shape[2]
 
-# Tiny dataset: use simple split (last 20%) just to show training works
+# Stratified split: ensure each class is represented in train & val
+from collections import defaultdict
 N = X.shape[0]
-split = max(int(N * 0.8), 1)
 
-Xtr, Xva = X[:split], X[split:]
-ytr, yva = y[:split], y[split:]
+# Group indices by class
+class_indices = defaultdict(list)
+for i, label in enumerate(y):
+    class_indices[int(label)].append(i)
+
+train_idx, val_idx = [], []
+for cls, indices in class_indices.items():
+    np.random.shuffle(indices)
+    split_pt = max(int(len(indices) * 0.8), 1)
+    train_idx.extend(indices[:split_pt])
+    val_idx.extend(indices[split_pt:] if split_pt < len(indices) else indices[:1])
+
+np.random.shuffle(train_idx)
+np.random.shuffle(val_idx)
+
+Xtr, Xva = X[train_idx], X[val_idx]
+ytr, yva = y[train_idx], y[val_idx]
+print(f"Train: {len(Xtr)}, Val: {len(Xva)}, Classes: {num_classes}")
 
 Xtr = torch.from_numpy(Xtr)
 ytr = torch.from_numpy(ytr)
@@ -40,13 +56,19 @@ class GRUClassifier(nn.Module):
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = GRUClassifier(D, 128, num_classes).to(device)
-opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-crit = nn.CrossEntropyLoss()
+opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)  # L2 regularization
+
+# Class weights to handle imbalance
+class_counts = np.bincount(ytr, minlength=num_classes).astype(np.float32)
+class_weights = 1.0 / (class_counts + 1e-6)
+class_weights = class_weights / class_weights.sum() * num_classes
+crit = nn.CrossEntropyLoss(weight=torch.from_numpy(class_weights).to(device))
 
 ROOT.joinpath("models").mkdir(exist_ok=True)
 best = -1.0
+patience, no_improve = 10, 0  # Early stopping
 
-for epoch in range(40):
+for epoch in range(80):  # More epochs, early stop will kick in
     model.train()
     perm = torch.randperm(len(Xtr))
 
@@ -73,7 +95,13 @@ for epoch in range(40):
 
     if va_acc > best:
         best = va_acc
+        no_improve = 0
         torch.save(model.state_dict(), ROOT / "models" / "exercise.pt")
+    else:
+        no_improve += 1
+        if no_improve >= patience:
+            print(f"Early stop at epoch {epoch}")
+            break
 
     print(f"epoch {epoch:02d}  train_acc={tr_acc:.3f}  val_acc={va_acc:.3f}  best={best:.3f}")
 
