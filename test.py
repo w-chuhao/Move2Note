@@ -1,9 +1,14 @@
+# identify_movement_3.py
+# 3-class: pushup, situp, squat
+# OpenCV reads frames
+# MediaPipe Tasks PoseLandmarker extracts landmarks
+# Heuristics classify clip + map to a note
+
 import cv2
 import numpy as np
 import mediapipe as mp
 from dataclasses import dataclass
 
-# MediaPipe Tasks PoseLandmarker (works with mediapipe versions that removed mp.solutions)
 BaseOptions = mp.tasks.BaseOptions
 PoseLandmarker = mp.tasks.vision.PoseLandmarker
 PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
@@ -32,21 +37,24 @@ def smooth(x, w=7):
 class Series:
     knee_angle: list
     elbow_angle: list
-    wrist_above_head: list
     body_horizontal: list
     ankle_spread: list
-    wrist_height: list
     hip_drop: list
+    torso_height: list   # mid_hip_y - mid_shoulder_y (bigger change for situps)
 
 
-def extract_feature_series(video_path, model_path="models/pose_landmarker_lite.task",
-                           target_fps=15, max_seconds=12):
+def extract_feature_series(
+    video_path,
+    model_path="models/pose_landmarker_lite.task",
+    target_fps=15,
+    max_seconds=12,
+):
     cap = cv2.VideoCapture(str(video_path))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(int(round(fps / target_fps)), 1)
     max_frames = int(target_fps * max_seconds)
 
-    s = Series([], [], [], [], [], [], [])
+    s = Series([], [], [], [], [], [])
     frame_idx = 0
 
     options = PoseLandmarkerOptions(
@@ -68,19 +76,15 @@ def extract_feature_series(video_path, model_path="models/pose_landmarker_lite.t
                 frame_idx += 1
                 continue
 
-            # OpenCV -> RGB -> MediaPipe Image
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
 
-            # Timestamp required for VIDEO mode (ms)
             ts_ms = int((frame_idx / fps) * 1000)
-
             result = landmarker.detect_for_video(mp_image, ts_ms)
             if not result.pose_landmarks:
                 frame_idx += 1
                 continue
 
-            # result.pose_landmarks[0] is a list of 33 landmarks (x,y,z,visibility)
             lms = result.pose_landmarks[0]
 
             def P(i):
@@ -92,7 +96,6 @@ def extract_feature_series(video_path, model_path="models/pose_landmarker_lite.t
             L_HIP, R_HIP = 23, 24
             L_KNE, R_KNE = 25, 26
             L_ANK, R_ANK = 27, 28
-            NOSE = 0
 
             mid_sh = ((P(L_SH)[0] + P(R_SH)[0]) / 2, (P(L_SH)[1] + P(R_SH)[1]) / 2)
             mid_hip = ((P(L_HIP)[0] + P(R_HIP)[0]) / 2, (P(L_HIP)[1] + P(R_HIP)[1]) / 2)
@@ -101,31 +104,27 @@ def extract_feature_series(video_path, model_path="models/pose_landmarker_lite.t
             knee = (angle(P(L_HIP), P(L_KNE), P(L_ANK)) + angle(P(R_HIP), P(R_KNE), P(R_ANK))) / 2
             elbow = (angle(P(L_SH), P(L_EL), P(L_WR)) + angle(P(R_SH), P(R_EL), P(R_WR))) / 2
 
-            head_y = P(NOSE)[1]
-            lw_y, rw_y = P(L_WR)[1], P(R_WR)[1]
-            wrists_high = 1.0 if (lw_y < head_y and rw_y < head_y) else 0.0
-
+            # "horizontal body" proxy: torso + hips not too separated vertically (works for pushup/situp)
             sh_to_hip = abs(mid_sh[1] - mid_hip[1])
             hip_to_ank = abs(mid_hip[1] - mid_ank[1])
             horizontal = 1.0 if (sh_to_hip < 0.10 and hip_to_ank < 0.15) else 0.0
 
             ankle_spread = abs(P(L_ANK)[0] - P(R_ANK)[0])
 
-            sh_y = (P(L_SH)[1] + P(R_SH)[1]) / 2
-            wrist_y = (lw_y + rw_y) / 2
-            wrist_height = sh_y - wrist_y
-
+            # squat indicator: hips go lower relative to knees (y increases downward)
             knee_y = (P(L_KNE)[1] + P(R_KNE)[1]) / 2
             hip_y = (P(L_HIP)[1] + P(R_HIP)[1]) / 2
             hip_drop = hip_y - knee_y
 
+            # situp indicator: torso height changes a lot (shoulders move up/down relative to hips)
+            torso_height = mid_hip[1] - mid_sh[1]
+
             s.knee_angle.append(knee)
             s.elbow_angle.append(elbow)
-            s.wrist_above_head.append(wrists_high)
             s.body_horizontal.append(horizontal)
             s.ankle_spread.append(ankle_spread)
-            s.wrist_height.append(wrist_height)
             s.hip_drop.append(hip_drop)
+            s.torso_height.append(torso_height)
 
             frame_idx += 1
 
@@ -137,30 +136,35 @@ def classify_clip(s: Series):
     if len(s.knee_angle) < 10:
         return "unknown", 0.0, {}
 
-    knee = np.array(s.knee_angle, dtype=np.float32)
-    elbow = np.array(s.elbow_angle, dtype=np.float32)
-    wrists_high = np.array(s.wrist_above_head, dtype=np.float32)
+    knee = smooth(s.knee_angle, 7)
+    elbow = smooth(s.elbow_angle, 7)
     horizontal = np.array(s.body_horizontal, dtype=np.float32)
-    ankle_spread = np.array(s.ankle_spread, dtype=np.float32)
-    wrist_height = np.array(s.wrist_height, dtype=np.float32)
-    hip_drop = np.array(s.hip_drop, dtype=np.float32)
+    ankle_spread = smooth(s.ankle_spread, 7)
+    hip_drop = smooth(s.hip_drop, 7)
+    torso_h = smooth(s.torso_height, 7)
 
-    ankle_spread_s = smooth(ankle_spread, 7)
-    hip_drop_s = smooth(hip_drop, 7)
-    elbow_s = smooth(elbow, 7)
-    knee_s = smooth(knee, 7)
+    def rng(x):
+        x = np.array(x, dtype=np.float32)
+        return float(np.percentile(x, 90) - np.percentile(x, 10))
 
-    knee_range = float(np.percentile(knee_s, 90) - np.percentile(knee_s, 10))
-    elbow_range = float(np.percentile(elbow_s, 90) - np.percentile(elbow_s, 10))
-    ankle_range = float(np.percentile(ankle_spread_s, 90) - np.percentile(ankle_spread_s, 10))
-    hipdrop_range = float(np.percentile(hip_drop_s, 90) - np.percentile(hip_drop_s, 10))
+    knee_range = rng(knee)
+    elbow_range = rng(elbow)
+    hipdrop_range = rng(hip_drop)
+    torso_range = rng(torso_h)
+    ankle_range = rng(ankle_spread)
+
+    horiz_mean = float(np.mean(horizontal))
 
     scores = {}
-    scores["jumpingjack"] = 2.5 * ankle_range + 0.5 * float(np.mean(ankle_spread_s) > 0.20)
-    scores["squat"] = 1.8 * knee_range + 2.2 * hipdrop_range + 0.5 * float(np.mean(hip_drop_s) > -0.02)
-    scores["pushup"] = 3.0 * float(np.mean(horizontal) > 0.40) + 1.8 * elbow_range
-    scores["curl"] = 2.2 * elbow_range + 1.0 * float(ankle_range < 0.05) + 1.0 * float(hipdrop_range < 0.05)
-    scores["press"] = 2.5 * float(np.mean(wrist_height) > 0.05) + 1.0 * float(np.mean(wrists_high) > 0.15) + 0.8 * elbow_range
+
+    # squat: strong knee bend + hip drop oscillation, not necessarily horizontal
+    scores["squat"] = 2.2 * knee_range + 2.8 * hipdrop_range + 0.2 * float(horiz_mean < 0.30)
+
+    # pushup: body horizontal + elbow bending
+    scores["pushup"] = 3.0 * float(horiz_mean > 0.35) + 2.2 * elbow_range + 0.2 * float(ankle_range < 0.06)
+
+    # situp: often horizontal-ish baseline + torso height changes a lot; elbows may change less than pushup
+    scores["situp"] = 2.8 * float(horiz_mean > 0.25) + 3.0 * torso_range + 0.3 * float(elbow_range < 35)
 
     best = max(scores, key=scores.get)
     vals = np.array(list(scores.values()), dtype=np.float32)
@@ -171,9 +175,7 @@ def classify_clip(s: Series):
 NOTE_MAP = {
     "squat": "C4",
     "pushup": "E4",
-    "jumpingjack": "G4",
-    "curl": "A4",
-    "press": "D4",
+    "situp": "G4",
 }
 
 
@@ -186,6 +188,7 @@ def identify(video_path):
 
 if __name__ == "__main__":
     import sys
+
     video = sys.argv[1]
     label, conf, note, scores = identify(video)
     print("predicted_exercise:", label)
