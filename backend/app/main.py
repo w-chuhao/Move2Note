@@ -26,9 +26,9 @@ T = 60
 D = 33 * 3
 
 NOTE_MAP = {
-    "pushup": "E4",
-    "situp": "G4",
-    "squat": "C4",
+    "push_ups": "E4",
+    "sit_ups": "G4",
+    "squats": "C4",
 }
 
 
@@ -86,14 +86,22 @@ def health() -> dict[str, str]:
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
-    if not file.filename or not file.filename.lower().endswith(".mp4"):
-        raise HTTPException(status_code=400, detail="Please upload an .mp4 file.")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided.")
+    
+    allowed_exts = {".mp4", ".mov", ".avi", ".webm"}
+    ext = Path(file.filename).suffix.lower()
+    if ext not in allowed_exts:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported format. Please upload {', '.join(allowed_exts)} files."
+        )
 
     storage_dir = ROOT / "backend" / "storage"
     storage_dir.mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile(
-        suffix=".mp4",
+        suffix=ext,
         dir=storage_dir,
         delete=False,
     ) as tmp:
