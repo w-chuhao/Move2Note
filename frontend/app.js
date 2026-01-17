@@ -5,6 +5,8 @@ const noteEl = document.getElementById("note-output");
 const labelEl = document.getElementById("label-output");
 const confEl = document.getElementById("confidence-output");
 const sequenceEl = document.getElementById("sequence-output");
+const songInput = document.getElementById("song-input");
+const songDetails = document.getElementById("song-details");
 
 const API_URL = "http://localhost:8000/predict";
 
@@ -12,21 +14,56 @@ const NOTE_FREQ = {
   C4: 261.63,
   D4: 293.66,
   E4: 329.63,
-  G4: 392.0,
-  A4: 440.0,
 };
 
 const NOTE_LABEL = {
-  push_ups: "E4",
-  sit_ups: "G4",
-  squats: "C4",
-  pushup: "E4",
-  situp: "G4",
-  squat: "C4",
+  push_ups: "D4",
+  sit_ups: "C4",
+  squats: "E4",
+  pushup: "D4",
+  situp: "C4",
+  squat: "E4",
 };
 
 const setStatus = (msg) => {
   statusEl.textContent = msg;
+};
+
+const NOTE_TO_EXERCISE = {
+  C4: "sit_ups",
+  D4: "push_ups",
+  E4: "squats",
+};
+
+const SONGS = {
+  "Baa Baa Black Sheep": {
+    notes: [
+      "C4", "C4", "D4", "D4", "E4", "E4", "D4",
+      "C4", "C4", "D4", "D4", "E4", "E4", "D4",
+      "D4", "D4", "C4", "C4", "D4", "D4", "C4",
+    ],
+  },
+};
+
+const renderSong = (name) => {
+  const song = SONGS[name];
+  if (!song) {
+    songDetails.textContent = "Song notes: --";
+    return;
+  }
+
+  const seq = song.notes.map((note) => `${note} (${NOTE_TO_EXERCISE[note]})`);
+  const counts = song.notes.reduce((acc, note) => {
+    const ex = NOTE_TO_EXERCISE[note];
+    acc[ex] = (acc[ex] || 0) + 1;
+    return acc;
+  }, {});
+
+  const countStr = Object.entries(counts)
+    .map(([ex, count]) => `${ex} x${count}`)
+    .join(", ");
+
+  songDetails.textContent = `Song notes: ${seq.join(" -> ")} | Total: ${countStr}`;
 };
 
 const playSequence = async (sequence) => {
@@ -111,6 +148,13 @@ input.addEventListener("change", () => {
     setStatus("Waiting for a clip.");
   }
 });
+
+if (songInput) {
+  songInput.addEventListener("input", (event) => {
+    renderSong(event.target.value);
+  });
+  renderSong(songInput.value);
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();

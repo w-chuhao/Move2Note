@@ -26,12 +26,12 @@ T = 60
 D = 33 * 3
 
 NOTE_MAP = {
-    "push_ups": "E4",
-    "sit_ups": "G4",
-    "squats": "C4",
-    "pushup": "E4",
-    "situp": "G4",
-    "squat": "C4",
+    "push_ups": "D4",
+    "sit_ups": "C4",
+    "squats": "E4",
+    "pushup": "D4",
+    "situp": "C4",
+    "squat": "E4",
 }
 
 

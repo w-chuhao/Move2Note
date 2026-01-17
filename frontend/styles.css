@@ -215,6 +215,38 @@ body {
   font-size: 0.9rem;
 }
 
+.song {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.song__label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.song__input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+  font-family: inherit;
+}
+
+.song__input:focus {
+  outline: none;
+  border-color: rgba(255, 139, 106, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 139, 106, 0.2);
+}
+
+.song__details {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 @keyframes drift {
   0%,
   100% {
