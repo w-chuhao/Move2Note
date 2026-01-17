@@ -77,11 +77,13 @@ pushups_01.mp4,1.2,push_ups_up
 pushups_01.mp4,2.4,push_ups_down
 ```
 
-Convert to frame labels:
+You can optionally convert to frame labels:
 
 ```
 python ml/convert_phase_seconds.py
 ```
+
+`ml/build_phase_dataset.py` can read the seconds file directly, so conversion is not required.
 
 ### Build dataset
 ```
