@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Move2Note</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Space+Grotesk:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">Hack-n-roll</p>
+          <h1>Turn movement into music.</h1>
+          <p class="lede">
+            Upload a short workout clip. We read your pose sequence and return a
+            matching music note.
+          </p>
+          <div class="meta">
+            <span>MP4 only</span>
+            <span>~30 seconds max</span>
+          </div>
+        </div>
+        <div class="hero__visual">
+          <div class="orb orb--one"></div>
+          <div class="orb orb--two"></div>
+          <div class="orb orb--three"></div>
+          <div class="card">
+            <div class="card__top">
+              <div class="badge">Exercise Note</div>
+              <p class="label">Awaiting upload</p>
+            </div>
+            <div class="card__note" id="note-output">—</div>
+            <div class="card__details">
+              <span id="label-output">Label: —</span>
+              <span id="confidence-output">Confidence: —</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <form id="upload-form" class="form">
+          <label class="file">
+            <input id="video-input" type="file" accept="video/mp4" />
+            <span>Choose MP4 video</span>
+          </label>
+          <button class="cta" type="submit">Analyze &amp; play note</button>
+        </form>
+        <div class="status" id="status">Waiting for a clip.</div>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
