@@ -2,7 +2,7 @@ from pathlib import Path
 import csv
 import numpy as np
 
-from ml.pose_tasks import video_to_keypoints
+from pose_tasks import video_to_keypoints
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
@@ -89,6 +89,15 @@ def resolve_video(path_str):
     candidate = RAW / path_str
     if candidate.exists():
         return candidate
+
+    # Search recursively under RAW so callers can specify just a filename.
+    matches = list(RAW.rglob(path_str))
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise FileNotFoundError(
+            f"Video name '{path_str}' is ambiguous; found: {', '.join(str(m) for m in matches)}"
+        )
     raise FileNotFoundError(f"Video not found: {path_str}")
 
 

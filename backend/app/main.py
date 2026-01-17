@@ -348,7 +348,7 @@ async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
             video_path=str(tmp_path),
             model_path=str(MODEL_PATH),
             target_fps=target_fps,
-            max_seconds=30,
+            max_seconds=36,
         )
         flat = seq.reshape(seq.shape[0], D).astype(np.float32)
         seq_xy = seq[:, :, :2]
