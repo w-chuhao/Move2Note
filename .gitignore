@@ -1,4 +1,4 @@
 data/
 *.mp4
 *.avi
-*.mov
+*.mov__pycache__/
