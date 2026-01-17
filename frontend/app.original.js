@@ -5,8 +5,6 @@ const noteEl = document.getElementById("note-output");
 const labelEl = document.getElementById("label-output");
 const confEl = document.getElementById("confidence-output");
 const sequenceEl = document.getElementById("sequence-output");
-const songInput = document.getElementById("song-input");
-const songDetails = document.getElementById("song-details");
 
 const API_URL = "http://localhost:8000/predict";
 
@@ -14,104 +12,21 @@ const NOTE_FREQ = {
   C4: 261.63,
   D4: 293.66,
   E4: 329.63,
+  G4: 392.0,
+  A4: 440.0,
 };
 
 const NOTE_LABEL = {
-  push_ups: "D4",
-  sit_ups: "C4",
-  squats: "E4",
-  pushup: "D4",
-  situp: "C4",
-  squat: "E4",
+  push_ups: "E4",
+  sit_ups: "G4",
+  squats: "C4",
+  pushup: "E4",
+  situp: "G4",
+  squat: "C4",
 };
 
 const setStatus = (msg) => {
   statusEl.textContent = msg;
-};
-
-const NOTE_TO_EXERCISE = {
-  C4: "sit_ups",
-  D4: "push_ups",
-  E4: "squats",
-};
-
-const NOTE_TO_NUM = {
-  C4: "1",
-  D4: "2",
-  E4: "3",
-};
-
-const SONGS = {
-  "Baa Baa Black Sheep": {
-    rows: [
-      {
-        title: "BAA BAA BLACK SHEEP",
-        notes: ["C4", "C4", "D4", "D4", "E4", "E4", "D4"],
-      },
-      {
-        title: "HAVE YOU ANY WOOL",
-        notes: ["C4", "C4", "D4", "D4", "E4", "E4", "D4"],
-      },
-      {
-        title: "YES SIR YES SIR",
-        notes: ["D4", "D4", "C4", "C4", "D4", "D4", "C4"],
-      },
-    ],
-    notes: [
-      "C4", "C4", "D4", "D4", "E4", "E4", "D4",
-      "C4", "C4", "D4", "D4", "E4", "E4", "D4",
-      "D4", "D4", "C4", "C4", "D4", "D4", "C4",
-    ],
-  },
-};
-
-const renderSong = (name) => {
-  const song = SONGS[name];
-  if (!song) {
-    songDetails.textContent = "Song notes: --";
-    return;
-  }
-
-  const counts = song.notes.reduce((acc, note) => {
-    const ex = NOTE_TO_EXERCISE[note];
-    acc[ex] = (acc[ex] || 0) + 1;
-    return acc;
-  }, {});
-
-  const countStr = Object.entries(counts)
-    .map(([ex, count]) => `${ex} x${count}`)
-    .join(", ");
-
-  const rows = song.rows || [];
-  const rowHtml = rows
-    .map((row) => {
-      const notesHtml = row.notes
-        .map((note) => {
-          const num = NOTE_TO_NUM[note] || "?";
-          const cls = note[0] ? `note-${note[0].toLowerCase()}` : "";
-          const ex = NOTE_TO_EXERCISE[note] || "unknown";
-          return `
-            <div class="song__note">
-              <div class="song__note-ex ${cls}">${ex.replace("_", " ")}</div>
-              <div class="song__note-letter">${note[0] || "-"}</div>
-            </div>
-          `;
-        })
-        .join("");
-
-      return `
-        <div class="song__row">
-          <div class="song__row-title">${row.title}</div>
-          <div class="song__notes">${notesHtml}</div>
-        </div>
-      `;
-    })
-    .join("");
-
-  songDetails.innerHTML = `
-    <div class="song__staff">${rowHtml}</div>
-    <div class="song__totals">Totals: ${countStr}</div>
-  `;
 };
 
 const playSequence = async (sequence) => {
@@ -165,17 +80,8 @@ const setResults = (data) => {
 
   const sequence = Array.isArray(data.sequence) ? data.sequence : [];
   if (sequence.length) {
-    const grouped = [];
-    for (const item of sequence) {
-      const last = grouped[grouped.length - 1];
-      if (last && last.label === item.label) {
-        last.count += 1;
-      } else {
-        grouped.push({ label: item.label, note: item.note, count: 1 });
-      }
-    }
-    const summary = grouped
-      .map((item) => `${item.label} x${item.count} (${item.note})`)
+    const summary = sequence
+      .map((item) => `${item.label} (${item.note})`)
       .join(" -> ");
     sequenceEl.textContent = `Sequence: ${summary}`;
     playSequence(sequence);
@@ -196,13 +102,6 @@ input.addEventListener("change", () => {
     setStatus("Waiting for a clip.");
   }
 });
-
-if (songInput) {
-  songInput.addEventListener("input", (event) => {
-    renderSong(event.target.value);
-  });
-  renderSong(songInput.value);
-}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();

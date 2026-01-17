@@ -36,10 +36,10 @@
               <div class="badge">Exercise Note</div>
               <p class="label">Awaiting upload</p>
             </div>
-            <div class="card__note" id="note-output">—</div>
+            <div class="card__note" id="note-output">--</div>
             <div class="card__details">
-              <span id="label-output">Label: —</span>
-              <span id="confidence-output">Confidence: —</span>
+              <span id="label-output">Label: --</span>
+              <span id="confidence-output">Confidence: --</span>
             </div>
           </div>
         </div>
@@ -54,6 +54,21 @@
           <button class="cta" type="submit">Analyze &amp; play note</button>
         </form>
         <div class="status" id="status">Waiting for a clip.</div>
+        <div class="sequence" id="sequence-output">Sequence: --</div>
+        <div class="song">
+          <label class="song__label" for="song-input">Pick a song</label>
+          <input
+            class="song__input"
+            id="song-input"
+            type="search"
+            list="song-options"
+            placeholder="Search songs..."
+          />
+          <datalist id="song-options">
+            <option value="Baa Baa Black Sheep"></option>
+          </datalist>
+          <div class="song__details" id="song-details">Song notes: --</div>
+        </div>
       </section>
     </main>
     <script src="./app.js"></script>

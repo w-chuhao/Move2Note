@@ -210,6 +210,116 @@ body {
   font-size: 0.95rem;
 }
 
+.sequence {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.song {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.song__label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.song__input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+  font-family: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.song__input:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(255, 139, 106, 0.25);
+}
+
+.song__input:focus {
+  outline: none;
+  border-color: rgba(255, 139, 106, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 139, 106, 0.2);
+}
+
+.song__details {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.song__staff {
+  display: grid;
+  gap: 14px;
+}
+
+.song__row {
+  display: grid;
+  gap: 8px;
+}
+
+.song__row-title {
+  font-family: "Fraunces", "Times New Roman", serif;
+  color: var(--ink);
+  letter-spacing: 0.05em;
+  font-size: 0.95rem;
+}
+
+.song__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.song__note {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 72px;
+}
+
+.song__note-letter {
+  font-weight: 600;
+  font-size: 1.6rem;
+  color: var(--ink);
+}
+
+.song__note-ex {
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.song__note-ex.note-c {
+  color: #ffd166;
+}
+
+.song__note-ex.note-d {
+  color: #ff8b6a;
+}
+
+.song__note-ex.note-e {
+  color: #78d6e3;
+}
+
+.song__totals {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+}
+
 @keyframes drift {
   0%,
   100% {
