@@ -80,17 +80,8 @@ const setResults = (data) => {
 
   const sequence = Array.isArray(data.sequence) ? data.sequence : [];
   if (sequence.length) {
-    const grouped = [];
-    for (const item of sequence) {
-      const last = grouped[grouped.length - 1];
-      if (last && last.label === item.label) {
-        last.count += 1;
-      } else {
-        grouped.push({ label: item.label, note: item.note, count: 1 });
-      }
-    }
-    const summary = grouped
-      .map((item) => `${item.label} x${item.count} (${item.note})`)
+    const summary = sequence
+      .map((item) => `${item.label} (${item.note})`)
       .join(" -> ");
     sequenceEl.textContent = `Sequence: ${summary}`;
     playSequence(sequence);

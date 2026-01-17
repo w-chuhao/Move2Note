@@ -96,105 +96,10 @@ def merge_predictions(
     for item in merged:
         item["start_s"] = round(float(item["start_frame"]) / fps, 2)
         item["end_s"] = round(float(item["end_frame"]) / fps, 2)
+        item.pop("start_frame", None)
+        item.pop("end_frame", None)
 
     return merged
-
-
-def angle_deg(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
-    ba = a - b
-    bc = c - b
-    denom = (np.linalg.norm(ba) * np.linalg.norm(bc)) + 1e-6
-    cosang = float(np.dot(ba, bc) / denom)
-    cosang = max(-1.0, min(1.0, cosang))
-    return float(np.degrees(np.arccos(cosang)))
-
-
-def fill_nans(arr: np.ndarray) -> np.ndarray:
-    out = arr.copy()
-    if np.all(np.isnan(out)):
-        return out
-    for i in range(1, len(out)):
-        if np.isnan(out[i]):
-            out[i] = out[i - 1]
-    for i in range(len(out) - 2, -1, -1):
-        if np.isnan(out[i]):
-            out[i] = out[i + 1]
-    return out
-
-
-def smooth(arr: np.ndarray, window: int = 5) -> np.ndarray:
-    if window <= 1:
-        return arr
-    pad = window // 2
-    padded = np.pad(arr, (pad, pad), mode="edge")
-    kernel = np.ones(window, dtype=np.float32) / window
-    return np.convolve(padded, kernel, mode="valid")
-
-
-def angle_series(seq_xy: np.ndarray, label: str) -> np.ndarray:
-    # Mediapipe pose indices.
-    L_SH, R_SH = 11, 12
-    L_EL, R_EL = 13, 14
-    L_WR, R_WR = 15, 16
-    L_HIP, R_HIP = 23, 24
-    L_KNEE, R_KNEE = 25, 26
-    L_ANK, R_ANK = 27, 28
-
-    angles = []
-    for frame in seq_xy:
-        if label == "push_ups":
-            a_l = angle_deg(frame[L_SH], frame[L_EL], frame[L_WR])
-            a_r = angle_deg(frame[R_SH], frame[R_EL], frame[R_WR])
-        elif label == "squats":
-            a_l = angle_deg(frame[L_HIP], frame[L_KNEE], frame[L_ANK])
-            a_r = angle_deg(frame[R_HIP], frame[R_KNEE], frame[R_ANK])
-        elif label == "sit_ups":
-            a_l = angle_deg(frame[L_SH], frame[L_HIP], frame[L_KNEE])
-            a_r = angle_deg(frame[R_SH], frame[R_HIP], frame[R_KNEE])
-        else:
-            angles.append(np.nan)
-            continue
-
-        angles.append((a_l + a_r) / 2.0)
-
-    ang = np.array(angles, dtype=np.float32)
-    ang = fill_nans(ang)
-    if np.any(~np.isnan(ang)):
-        ang = smooth(ang, window=5)
-    return ang
-
-
-def count_reps(
-    seq_xy: np.ndarray,
-    label: str,
-    high_thr: float,
-    low_thr: float,
-    min_frames: int = 8,
-) -> list[int]:
-    ang = angle_series(seq_xy, label)
-    if np.all(np.isnan(ang)):
-        return []
-
-    state = "unknown"
-    reps = []
-    last_rep = -min_frames
-    for i, val in enumerate(ang):
-        if np.isnan(val):
-            continue
-        if state == "unknown":
-            if val > high_thr:
-                state = "up"
-            elif val < low_thr:
-                state = "down"
-            continue
-        if state == "up" and val < low_thr:
-            state = "down"
-        elif state == "down" and val > high_thr and (i - last_rep) >= min_frames:
-            reps.append(i)
-            last_rep = i
-            state = "up"
-
-    return reps
 
 
 def load_classifier() -> tuple[GRUClassifier, dict[str, int]]:
@@ -256,7 +161,6 @@ async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
             max_seconds=30,
         )
         flat = seq.reshape(seq.shape[0], D).astype(np.float32)
-        seq_xy = seq[:, :, :2]
 
         preds = []
         stride = 15  # ~1 second at 15 fps
@@ -280,67 +184,7 @@ async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
                 )
 
         sequence = merge_predictions(preds, fps=float(target_fps))
-        rep_events = []
-        segments = []
-        for seg in sequence:
-            label = str(seg["label"])
-            start_frame = int(seg.get("start_frame", 0))
-            end_frame = int(seg.get("end_frame", start_frame + 1))
-            end_frame = min(end_frame, seq_xy.shape[0])
-            start_frame = max(0, min(start_frame, end_frame - 1))
-
-            thresholds = {
-                "push_ups": (160.0, 95.0),
-                "sit_ups": (160.0, 95.0),
-                "squats": (165.0, 100.0),
-            }
-            high_thr, low_thr = thresholds.get(label, (160.0, 100.0))
-            reps = count_reps(
-                seq_xy[start_frame:end_frame],
-                label,
-                high_thr=high_thr,
-                low_thr=low_thr,
-                min_frames=8,
-            )
-
-            if reps:
-                for rep in reps:
-                    frame_idx = start_frame + rep
-                    t_s = round(frame_idx / float(target_fps), 2)
-                    rep_events.append(
-                        {
-                            "label": label,
-                            "note": NOTE_MAP.get(label, "NA"),
-                            "confidence": seg["confidence"],
-                            "start_s": t_s,
-                            "end_s": t_s,
-                        }
-                    )
-            else:
-                mid_s = round((float(seg["start_s"]) + float(seg["end_s"])) / 2.0, 2)
-                rep_events.append(
-                    {
-                        "label": label,
-                        "note": NOTE_MAP.get(label, "NA"),
-                        "confidence": seg["confidence"],
-                        "start_s": mid_s,
-                        "end_s": mid_s,
-                    }
-                )
-
-            segments.append(
-                {
-                    "label": label,
-                    "note": NOTE_MAP.get(label, "NA"),
-                    "confidence": seg["confidence"],
-                    "start_s": seg["start_s"],
-                    "end_s": seg["end_s"],
-                    "reps": len(reps),
-                }
-            )
-
-        rep_events.sort(key=lambda x: float(x["start_s"]))
-        primary = rep_events[0] if rep_events else {"label": "NA", "note": "NA", "confidence": 0.0}
+        primary = sequence[0] if sequence else {"label": "NA", "note": "NA", "confidence": 0.0}
         pred_label = primary["label"]
         conf = float(primary["confidence"])
         note = primary["note"]
@@ -354,7 +198,6 @@ async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
         "label": pred_label,
         "confidence": round(conf, 4),
         "note": note,
-        "sequence": rep_events,
-        "segments": segments,
+        "sequence": sequence,
         "frames": int(seq.shape[0]),
     }
