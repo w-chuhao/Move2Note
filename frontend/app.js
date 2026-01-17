@@ -35,8 +35,28 @@ const NOTE_TO_EXERCISE = {
   E4: "squats",
 };
 
+const NOTE_TO_NUM = {
+  C4: "1",
+  D4: "2",
+  E4: "3",
+};
+
 const SONGS = {
   "Baa Baa Black Sheep": {
+    rows: [
+      {
+        title: "BAA BAA BLACK SHEEP",
+        notes: ["C4", "C4", "D4", "D4", "E4", "E4", "D4"],
+      },
+      {
+        title: "HAVE YOU ANY WOOL",
+        notes: ["C4", "C4", "D4", "D4", "E4", "E4", "D4"],
+      },
+      {
+        title: "YES SIR YES SIR",
+        notes: ["D4", "D4", "C4", "C4", "D4", "D4", "C4"],
+      },
+    ],
     notes: [
       "C4", "C4", "D4", "D4", "E4", "E4", "D4",
       "C4", "C4", "D4", "D4", "E4", "E4", "D4",
@@ -52,7 +72,6 @@ const renderSong = (name) => {
     return;
   }
 
-  const seq = song.notes.map((note) => `${note} (${NOTE_TO_EXERCISE[note]})`);
   const counts = song.notes.reduce((acc, note) => {
     const ex = NOTE_TO_EXERCISE[note];
     acc[ex] = (acc[ex] || 0) + 1;
@@ -63,7 +82,36 @@ const renderSong = (name) => {
     .map(([ex, count]) => `${ex} x${count}`)
     .join(", ");
 
-  songDetails.textContent = `Song notes: ${seq.join(" -> ")} | Total: ${countStr}`;
+  const rows = song.rows || [];
+  const rowHtml = rows
+    .map((row) => {
+      const notesHtml = row.notes
+        .map((note) => {
+          const num = NOTE_TO_NUM[note] || "?";
+          const cls = note[0] ? `note-${note[0].toLowerCase()}` : "";
+          const ex = NOTE_TO_EXERCISE[note] || "unknown";
+          return `
+            <div class="song__note">
+              <div class="song__note-ex ${cls}">${ex.replace("_", " ")}</div>
+              <div class="song__note-letter">${note[0] || "-"}</div>
+            </div>
+          `;
+        })
+        .join("");
+
+      return `
+        <div class="song__row">
+          <div class="song__row-title">${row.title}</div>
+          <div class="song__notes">${notesHtml}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  songDetails.innerHTML = `
+    <div class="song__staff">${rowHtml}</div>
+    <div class="song__totals">Totals: ${countStr}</div>
+  `;
 };
 
 const playSequence = async (sequence) => {
